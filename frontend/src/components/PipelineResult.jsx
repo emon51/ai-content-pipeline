@@ -1,6 +1,8 @@
 /**
  * Displays the pipeline processing result.
  */
+import PropTypes from "prop-types";
+
 export default function PipelineResult({ result }) {
   if (!result) return null;
 
@@ -30,3 +32,20 @@ export default function PipelineResult({ result }) {
     </div>
   );
 }
+
+PipelineResult.propTypes = {
+  result: PropTypes.shape({
+    message: PropTypes.string.isRequired,
+    input_stored_at: PropTypes.string.isRequired,
+    ai_response_stored_at: PropTypes.string.isRequired,
+    per_id_files: PropTypes.arrayOf(PropTypes.string).isRequired,
+    ai_result: PropTypes.shape({
+      title: PropTypes.string.isRequired,
+      description: PropTypes.string.isRequired,
+    }).isRequired,
+  }),
+};
+
+PipelineResult.defaultProps = {
+  result: null,
+};
