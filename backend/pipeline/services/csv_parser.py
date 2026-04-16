@@ -4,22 +4,23 @@ import csv
 import io
 
 
-def parse_and_validate_csv(file) -> list[str]:
+def parse_and_validate_csv(file) -> dict:
     """
-    Parse uploaded CSV file and return a deduplicated list of IDs.
+    Parse uploaded CSV file and return a single row as a dict.
 
     Expected CSV format:
         id,title,description
-        BC-12199453,Some Title,Some Description
+        BC-12199453,The Bluefin - Luxury Beach Home!,6-bedroom beach home in Destin.
 
     Args:
         file: InMemoryUploadedFile from request.FILES
 
     Returns:
-        List of unique ID strings.
+        Dict with keys: id, title, description.
 
     Raises:
-        ValueError: If CSV is missing 'id' column or has no valid rows.
+        ValueError: If CSV is missing required columns, has no rows,
+                    or contains more than one data row.
     """
     try:
         decoded = file.read().decode("utf-8")
@@ -28,24 +29,23 @@ def parse_and_validate_csv(file) -> list[str]:
 
     reader = csv.DictReader(io.StringIO(decoded))
 
-    if "id" not in (reader.fieldnames or []):
-        raise ValueError("CSV must contain an 'id' column.")
+    required_columns = {"id", "title", "description"}
+    missing = required_columns - set(reader.fieldnames or [])
+    if missing:
+        raise ValueError(f"CSV is missing required columns: {missing}")
 
-    ids = []
-    for row in reader:
-        raw_id = row.get("id", "").strip()
-        if raw_id:
-            ids.append(raw_id)
+    rows = [row for row in reader if row.get("id", "").strip()]
 
-    if not ids:
-        raise ValueError("CSV contains no valid ID rows.")
+    if len(rows) == 0:
+        raise ValueError("CSV contains no valid data rows.")
 
-    # Deduplicate while preserving order
-    seen = set()
-    unique_ids = []
-    for id_ in ids:
-        if id_ not in seen:
-            seen.add(id_)
-            unique_ids.append(id_)
+    if len(rows) > 1:
+        raise ValueError("CSV must contain exactly one data row.")
 
-    return unique_ids
+    row = rows[0]
+
+    return {
+        "id":          row["id"].strip(),
+        "title":       row["title"].strip(),
+        "description": row["description"].strip(),
+    }
