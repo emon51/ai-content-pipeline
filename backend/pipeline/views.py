@@ -7,7 +7,7 @@ from rest_framework import status
 from .serializers import PipelineInputSerializer
 from .services.csv_parser import parse_and_validate_csv
 from .services.storage import upload_json
-from .services.ai_processor import enhance_content
+from .services.ai_processor import enhance_content, build_title_prompt, build_description_prompt
 
 
 class PipelineProcessView(APIView):
@@ -47,8 +47,6 @@ class PipelineProcessView(APIView):
         csv_description    = csv_row["description"]
 
         # Step 3 & 4: Build modified prompts and store as input.json
-        from .services.ai_processor import build_title_prompt, build_description_prompt
-
         modified_title_prompt       = build_title_prompt(title_prompt, csv_title)
         modified_description_prompt = build_description_prompt(description_prompt, csv_description)
 
