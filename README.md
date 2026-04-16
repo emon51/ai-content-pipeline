@@ -1,11 +1,6 @@
 # AI Content Pipeline
 
-An end-to-end content processing system that accepts property data, enhances it using AI (SEO transformation via Groq), stores results in MinIO (S3-compatible) and generates structured per-ID output files.
-
----
-## Overview
-
-The pipeline accepts property data (title, description, CSV of IDs) from a React frontend, processes and stores the data in MinIO, enhances the content using the Groq AI API for SEO optimization, and generates structured per-ID JSON output files.
+An end-to-end content processing system that accepts property data, enhances it using AI (SEO transformation via Groq), stores results in MinIO (S3-compatible) and generates structured per-ID output file.
 
 ---
 
@@ -24,7 +19,7 @@ The pipeline accepts property data (title, description, CSV of IDs) from a React
 ## Project Structure
 
 ```
-content-pipeline/
+ai-content-pipeline/
 ├── docker-compose.yml
 ├── README.md
 ├── backend/
@@ -44,8 +39,7 @@ content-pipeline/
 │       └── services/
 │           ├── csv_parser.py
 │           ├── storage.py
-│           ├── ai_processor.py
-│           └── id_generator.py
+│           └── ai_processor.py
 └── frontend/
     ├── Dockerfile
     ├── package.json
