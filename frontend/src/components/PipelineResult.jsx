@@ -21,12 +21,10 @@ export default function PipelineResult({ result }) {
 
       <section>
         <h3>Stored Files</h3>
-        <p><strong>Input:</strong> {result.input_stored_at}</p>
-        <p><strong>AI Response:</strong> {result.ai_response_stored_at}</p>
         <ul>
-          {result.per_id_files.map((key) => (
-            <li key={key}>{key}</li>
-          ))}
+          <li><strong>Input:</strong> {result.input_stored_at}</li>
+          <li><strong>Output:</strong> {result.output_stored_at}</li>
+          <li><strong>ID File:</strong> {result.id_file_stored_at}</li>
         </ul>
       </section>
     </div>
@@ -35,12 +33,12 @@ export default function PipelineResult({ result }) {
 
 PipelineResult.propTypes = {
   result: PropTypes.shape({
-    message: PropTypes.string.isRequired,
-    input_stored_at: PropTypes.string.isRequired,
-    ai_response_stored_at: PropTypes.string.isRequired,
-    per_id_files: PropTypes.arrayOf(PropTypes.string).isRequired,
+    message:          PropTypes.string.isRequired,
+    input_stored_at:  PropTypes.string.isRequired,
+    output_stored_at: PropTypes.string.isRequired,
+    id_file_stored_at: PropTypes.string.isRequired,
     ai_result: PropTypes.shape({
-      title: PropTypes.string.isRequired,
+      title:       PropTypes.string.isRequired,
       description: PropTypes.string.isRequired,
     }).isRequired,
   }),
