@@ -4,22 +4,45 @@ from groq import Groq
 from django.conf import settings
 
 
-TITLE_PROMPT = """You are an expert travel blogger who creates content for high-performing travel accommodation, event, and activity booking websites that are search engine optimized. Rephrase the "{PropertyName}" title into a more SEO-friendly title. Use only the provided data without introducing new information or assumptions. The output should be in plain text. The text should be SEO-optimized for keywords related to the location. Incorporate the location naturally within the content."""
-
-DESCRIPTION_PROMPT = """You are an expert travel blogger who creates content for high-performing travel accommodation, event and activity booking websites that are search engine optimized. Rephrase the "{PropertyDescription}" description into a more SEO-friendly and engaging paragraph. Use only the provided data without adding new assumptions. Output MUST be HTML with exactly ONE <p> tag only."""
-
-
 def get_groq_client() -> Groq:
     """Create and return a Groq client using Django settings."""
     return Groq(api_key=settings.GROQ_API_KEY)
 
 
-def enhance_title(title: str) -> str:
+def build_title_prompt(title_prompt: str, csv_title: str) -> str:
     """
-    Send title to Groq and return SEO-optimized plain text title.
+    Inject CSV row title into the title prompt template.
 
     Args:
-        title: Original property title.
+        title_prompt: Prompt template containing {PropertyName} placeholder.
+        csv_title:    Property title from CSV row.
+
+    Returns:
+        Fully constructed title prompt string.
+    """
+    return title_prompt.replace("{PropertyName}", csv_title)
+
+
+def build_description_prompt(description_prompt: str, csv_description: str) -> str:
+    """
+    Inject CSV row description into the description prompt template.
+
+    Args:
+        description_prompt: Prompt template containing {PropertyDescription} placeholder.
+        csv_description:    Property description from CSV row.
+
+    Returns:
+        Fully constructed description prompt string.
+    """
+    return description_prompt.replace("{PropertyDescription}", csv_description)
+
+
+def enhance_title(modified_prompt: str) -> str:
+    """
+    Send fully constructed title prompt to Groq and return SEO title.
+
+    Args:
+        modified_prompt: Title prompt with {PropertyName} already replaced.
 
     Returns:
         SEO-enhanced title as plain text.
@@ -28,11 +51,10 @@ def enhance_title(title: str) -> str:
         Exception: On Groq API failure.
     """
     client = get_groq_client()
-    prompt = TITLE_PROMPT.replace("{PropertyName}", title)
 
     response = client.chat.completions.create(
         model=settings.GROQ_MODEL,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": modified_prompt}],
         temperature=0.7,
         max_tokens=200,
     )
@@ -40,12 +62,12 @@ def enhance_title(title: str) -> str:
     return response.choices[0].message.content.strip()
 
 
-def enhance_description(description: str) -> str:
+def enhance_description(modified_prompt: str) -> str:
     """
-    Send description to Groq and return SEO-optimized HTML description.
+    Send fully constructed description prompt to Groq and return SEO HTML description.
 
     Args:
-        description: Original property description.
+        modified_prompt: Description prompt with {PropertyDescription} already replaced.
 
     Returns:
         SEO-enhanced description as HTML with exactly one <p> tag.
@@ -54,11 +76,10 @@ def enhance_description(description: str) -> str:
         Exception: On Groq API failure.
     """
     client = get_groq_client()
-    prompt = DESCRIPTION_PROMPT.replace("{PropertyDescription}", description)
 
     response = client.chat.completions.create(
         model=settings.GROQ_MODEL,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": modified_prompt}],
         temperature=0.7,
         max_tokens=500,
     )
@@ -66,24 +87,37 @@ def enhance_description(description: str) -> str:
     return response.choices[0].message.content.strip()
 
 
-def enhance_content(title: str, description: str) -> dict:
+def enhance_content(
+    title_prompt: str,
+    description_prompt: str,
+    csv_title: str,
+    csv_description: str,
+) -> dict:
     """
-    Enhance both title and description using Groq AI.
+    Build modified prompts by injecting CSV data, then enhance via Groq AI.
 
     Args:
-        title: Original property title.
-        description: Original property description.
+        title_prompt:       Raw title prompt template from frontend.
+        description_prompt: Raw description prompt template from frontend.
+        csv_title:          Property title extracted from CSV row.
+        csv_description:    Property description extracted from CSV row.
 
     Returns:
-        Dict with enhanced 'title' and 'description'.
-
-    Raises:
-        Exception: On Groq API failure.
+        Dict with keys:
+            - modified_title_prompt:       Final prompt sent to AI for title.
+            - modified_description_prompt: Final prompt sent to AI for description.
+            - title:                       AI-enhanced SEO title.
+            - description:                 AI-enhanced SEO HTML description.
     """
-    enhanced_title = enhance_title(title)
-    enhanced_description = enhance_description(description)
+    modified_title_prompt       = build_title_prompt(title_prompt, csv_title)
+    modified_description_prompt = build_description_prompt(description_prompt, csv_description)
+
+    enhanced_title       = enhance_title(modified_title_prompt)
+    enhanced_description = enhance_description(modified_description_prompt)
 
     return {
-        "title": enhanced_title,
-        "description": enhanced_description,
+        "modified_title_prompt":       modified_title_prompt,
+        "modified_description_prompt": modified_description_prompt,
+        "title":                       enhanced_title,
+        "description":                 enhanced_description,
     }
