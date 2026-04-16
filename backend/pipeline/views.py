@@ -8,91 +8,123 @@ from .serializers import PipelineInputSerializer
 from .services.csv_parser import parse_and_validate_csv
 from .services.storage import upload_json
 from .services.ai_processor import enhance_content
-from .services.id_generator import generate_per_id_files
 
 
 class PipelineProcessView(APIView):
     """
-    POST /api/process/
+    POST /api/v1/process/
+
     Full pipeline:
-      1. Validate input
-      2. Parse CSV
-      3. Store raw input to MinIO
-      4. Enhance content via Groq AI
-      5. Store AI response to MinIO
-      6. Generate per-ID JSON files in MinIO
+      1. Validate form input
+      2. Parse single-row CSV → extract id, title, description
+      3. Inject CSV data into prompt templates
+      4. Store modified prompts + id + site_name as input.json
+      5. Send modified prompts to Groq AI
+      6. Store raw AI response as output.json
+      7. Store processed id + title + description as {id}.json
     """
 
     def post(self, request):
-        # Step 1: Validate input
+
+        # Step 1: Validate form input
         serializer = PipelineInputSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         validated = serializer.validated_data
 
-        # Step 2: Parse CSV
+        # Step 2: Parse single-row CSV
         try:
-            ids = parse_and_validate_csv(validated["csv_file"])
+            csv_row = parse_and_validate_csv(validated["csv_file"])
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        site_name = validated["site_name"]
-        title = validated["title"]
-        description = validated["description"]
+        site_name          = validated["site_name"]
+        title_prompt       = validated["title_prompt"]
+        description_prompt = validated["description_prompt"]
+        csv_id             = csv_row["id"]
+        csv_title          = csv_row["title"]
+        csv_description    = csv_row["description"]
 
-        payload = {
-            "site_name": site_name,
-            "title": title,
-            "description": description,
-            "ids": ids,
+        # Step 3 & 4: Build modified prompts and store as input.json
+        from .services.ai_processor import build_title_prompt, build_description_prompt
+
+        modified_title_prompt       = build_title_prompt(title_prompt, csv_title)
+        modified_description_prompt = build_description_prompt(description_prompt, csv_description)
+
+        input_payload = {
+            "id":                          csv_id,
+            "site_name":                   site_name,
+            "modified_title_prompt":       modified_title_prompt,
+            "modified_description_prompt": modified_description_prompt,
         }
 
-        # Step 3: Store raw input in MinIO
         input_key = f"{site_name}/details/input/input.json"
         try:
-            upload_json(input_key, payload)
+            upload_json(input_key, input_payload)
         except Exception as e:
             return Response(
-                {"error": f"Storage failed: {str(e)}"},
+                {"error": f"Input storage failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Step 4: Enhance content via Groq AI
+        # Step 5: Send to Groq AI
         try:
-            ai_result = enhance_content(title, description)
+            ai_result = enhance_content(
+                title_prompt=title_prompt,
+                description_prompt=description_prompt,
+                csv_title=csv_title,
+                csv_description=csv_description,
+            )
         except Exception as e:
             return Response(
                 {"error": f"AI processing failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Step 5: Store AI response in MinIO
-        ai_output_key = f"{site_name}/details/output/ai_response.json"
+        # Step 6: Store raw AI response as output.json
+        raw_output = {
+            "id":          csv_id,
+            "site_name":   site_name,
+            "title":       ai_result["title"],
+            "description": ai_result["description"],
+        }
+
+        output_key = f"{site_name}/details/output/output.json"
         try:
-            upload_json(ai_output_key, ai_result)
+            upload_json(output_key, raw_output)
         except Exception as e:
             return Response(
-                {"error": f"AI response storage failed: {str(e)}"},
+                {"error": f"Output storage failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Step 6: Generate per-ID JSON files
+        # Step 7: Store processed result as {id}.json
+        id_payload = {
+            "id":          csv_id,
+            "title":       ai_result["title"],
+            "description": ai_result["description"],
+        }
+
+        id_key = f"{site_name}/details/{csv_id}.json"
         try:
-            id_keys = generate_per_id_files(site_name, ids, ai_result)
+            upload_json(id_key, id_payload)
         except Exception as e:
             return Response(
-                {"error": f"Per-ID file generation failed: {str(e)}"},
+                {"error": f"ID file storage failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         return Response(
             {
-                "message": "Pipeline completed successfully.",
-                "input_stored_at": input_key,
-                "ai_response_stored_at": ai_output_key,
-                "per_id_files": id_keys,
-                "ai_result": ai_result,
+                "message":        "Pipeline completed successfully.",
+                "input_stored_at":  input_key,
+                "output_stored_at": output_key,
+                "id_file_stored_at": id_key,
+                "ai_result": {
+                    "title":       ai_result["title"],
+                    "description": ai_result["description"],
+                },
             },
             status=status.HTTP_200_OK,
         )
