@@ -26,11 +26,11 @@ The pipeline accepts property data (title, description, CSV of IDs) from a React
 ```
 content-pipeline/
 ├── docker-compose.yml
-├── .gitignore
 ├── README.md
 ├── backend/
 │   ├── Dockerfile
-│   ├── .env                     
+│   ├── .env   
+|   ├── .gitignore                  
 │   ├── requirements.txt
 │   ├── manage.py
 │   ├── core/
@@ -50,6 +50,7 @@ content-pipeline/
     ├── Dockerfile
     ├── package.json
     ├── vite.config.js
+    ├── .gitignore
     └── src/
         ├── App.jsx
         ├── App.css
@@ -119,7 +120,7 @@ Navigate to **http://localhost:5173** in your browser.
 
 ## API Reference
 
-### `POST /api/process/`
+### `POST /api/v1/process/`
 
 Runs the full pipeline — parses CSV, stores input, enhances content via AI, generates per-ID files.
 
@@ -128,41 +129,12 @@ Runs the full pipeline — parses CSV, stores input, enhances content via AI, ge
 | Field         | Type   | Description                        |
 |---------------|--------|------------------------------------|
 | `site_name`   | string | Site identifier (e.g. `rentbyowner.com`) |
-| `title`       | string | Property title                     |
-| `description` | string | Property description               |
-| `csv_file`    | file   | CSV file with `id` column          |
+| `title`       | string | Property title prompt with place holder "{PropertyName}"                  |
+| `description` | string | Property description prompt with place holder "{PropertyDescription}"               |
+| `csv_file`    | file   | CSV file contain only one record with `id`, `title` and `description` column          |
 
-**CSV Format**
-
-```csv
-id,title,description
-```
-
-
-**Error Responses**
-
-| Status | Reason                          |
-|--------|---------------------------------|
-| `400`  | Invalid input or bad CSV        |
-| `500`  | Storage or AI processing failed |
 
 ---
-
-## Pipeline Flow
-
-```
-Frontend (React)
-     │  POST multipart/form-data
-     ▼
-Backend (DRF) /api/process/
-     │
-     ├── 1. Validate input (serializer)
-     ├── 2. Parse & deduplicate CSV IDs
-     ├── 3. Store input.json → MinIO
-     ├── 4. Enhance via Groq AI (title + description)
-     ├── 5. Store ai_response.json → MinIO
-     └── 6. Generate per-ID .json files → MinIO
-```
 
 ---
 
@@ -173,11 +145,10 @@ rebrand-content/
 └── {site_name}/
     └── details/
         ├── input/
-        │   └── input.json          ← raw parsed input
+        │   └── input.json        # raw parsed input
         ├── output/
-        │   └── ai_response.json    ← Groq AI output
-        ├── BC-12199453.json        ← per-ID file
-        └── BC-12443396.json        ← per-ID file
+        │   └── output.json       # Groq AI raw response
+        └── <Id>.json             # per-ID file
 ```
 
 
@@ -186,6 +157,6 @@ rebrand-content/
 | Service        | URL                        | Credentials                  |
 |----------------|----------------------------|------------------------------|
 | Frontend       | http://localhost:5173      | —                            |
-| Backend API    | http://localhost:8000/api/ | —                            |
+| Backend API    | http://localhost:8000/api/v1/ | —                            |
 | MinIO Console  | http://localhost:9001      | `minioadmin` / `minioadmin`  |
 | MinIO API      | http://localhost:9000      | —                            |
