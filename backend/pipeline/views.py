@@ -1,12 +1,13 @@
 """API views for the content pipeline."""
 
+from botocore.exceptions import ClientError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
 from .serializers import PipelineInputSerializer
 from .services.csv_parser import parse_and_validate_csv
-from .services.storage import upload_json
+from .services.storage import upload_json, download_json
 from .services.ai_processor import enhance_content, build_title_prompt, build_description_prompt
 
 
@@ -126,3 +127,36 @@ class PipelineProcessView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+class PropertyDetailView(APIView):
+    """
+    GET /api/v1/<site_name>/details/<id>/
+
+    Retrieve the generated JSON file for a specific property ID.
+
+    URL Params:
+        site_name: The site identifier (e.g. rentbyowner.com).
+        id:        The property ID (e.g. BC-12199453).
+
+    Returns:
+        JSON content of {site_name}/details/{id}.json from MinIO.
+    """
+
+    def get(self, request, site_name, id):
+        key = f"{site_name}/details/{id}.json"
+
+        try:
+            data = download_json(key)
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "NoSuchKey":
+                return Response(
+                    {"error": f"No file found for ID '{id}' under site '{site_name}'."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            return Response(
+                {"error": f"Storage error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(data, status=status.HTTP_200_OK)

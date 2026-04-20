@@ -40,3 +40,27 @@ def upload_json(key: str, data: dict) -> str:
     )
 
     return key
+
+
+def download_json(key: str) -> dict:
+    """
+    Download and deserialize a JSON file from S3/MinIO.
+
+    Args:
+        key: S3 object key.
+
+    Returns:
+        Parsed JSON as a Python dict.
+
+    Raises:
+        botocore.exceptions.ClientError: If the object does not exist or
+                                         on any other S3 failure.
+    """
+    client = get_s3_client()
+
+    response = client.get_object(
+        Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+        Key=key,
+    )
+
+    return json.loads(response["Body"].read().decode("utf-8"))
